@@ -1,0 +1,45 @@
+syntax = "proto3";
+
+package token;
+
+option java_multiple_files = true;
+option java_package = "com.token_service.grpc";
+option java_outer_classname = "TokenProto";
+
+service TokenService {
+  rpc IssueToken (IssueTokenRequest) returns (IssueTokenResponse);
+  rpc RefreshToken (RefreshTokenRequest) returns (IssueTokenResponse);
+
+  rpc RevokeToken (RevokeTokenRequest) returns (RevokeResponse);
+  rpc RevokeAllTokens (RevokeAllTokensRequest) returns (RevokeResponse);
+}
+
+message IssueTokenRequest {
+  string userId = 1;
+  string deviceHash = 2;
+}
+
+message RefreshTokenRequest {
+  string refreshToken = 1;
+  string deviceHash = 2;
+  string accessJti = 3;
+}
+
+message RevokeTokenRequest {
+  string refreshToken = 1;
+  string deviceHash = 2;
+}
+
+message RevokeAllTokensRequest {
+  string userId = 1;
+}
+
+message IssueTokenResponse {
+  string accessToken = 1;
+  string refreshToken = 2;
+  int64 expiresIn = 3;
+}
+
+message RevokeResponse {
+  bool success = 1;
+}

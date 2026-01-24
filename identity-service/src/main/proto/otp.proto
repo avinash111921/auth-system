@@ -1,0 +1,20 @@
+syntax = "proto3";
+
+option java_multiple_files = true;
+option java_package = "com.otp.grpc";
+option java_outer_classname = "OtpProto";
+
+service OtpService {
+
+  rpc verifyOtp (OtpVerifyRequest) returns (OtpVerifyResponse);
+
+  rpc VerifyPasswordResetOtp (OtpVerifyRequest) returns (OtpVerifyResponse);
+}
+message OtpVerifyRequest {
+  string email = 1;
+  string otp = 2;
+}
+
+message OtpVerifyResponse {
+  bool valid = 1;
+}

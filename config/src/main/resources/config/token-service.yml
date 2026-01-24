@@ -1,0 +1,50 @@
+server:
+  port: 8082
+
+spring:
+#  application:
+#    name: token-service
+  data:
+    redis:
+      host: redis_container
+      port: 6379
+      timeout: 2000ms
+      lettuce:
+        pool:
+          max-active: 16
+          max-idle: 8
+          min-idle: 2
+      database: 0
+
+jwt:
+  issuer: auth-platform
+  accessTtl: 900
+  refreshTtl: 2592000
+  key-rotation:
+    rotate-delay-ms: 21600000
+    cleanup-delay-ms: 3600000
+    rotate-every-hours: 6
+    retain-old-keys-hours: 24
+    max-keys: 10
+
+
+shedlock:
+  enabled: true
+  table-name: shedlock
+  lock-at-most-for: 5m
+  lock-at-least-for: 30s
+
+eureka:
+  instance:
+    hostname: localhost
+    prefer-ip-address: true
+
+  client:
+    service-url:
+      defaultZone: http://localhost:8761/eureka
+    register-with-eureka: true
+    fetch-registry: true
+
+grpc:
+  server:
+    port: 9091

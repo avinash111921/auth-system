@@ -1,0 +1,14 @@
+spring:
+  application:
+    name: config
+  profiles:
+    active: native
+
+  cloud:
+    config:
+      server:
+        native:
+          search-locations: file:///C:\Users\apexc\Desktop\auth-platfrom\config\src\main\resources\config
+
+server:
+  port: 8888

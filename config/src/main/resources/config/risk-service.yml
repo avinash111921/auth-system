@@ -1,0 +1,30 @@
+server:
+  port: 8085
+
+spring:
+  data:
+    redis:
+      host: redis_container
+      port: 6379
+      timeout: 2000ms
+      lettuce:
+        pool:
+          max-active: 16
+          max-idle: 8
+          min-idle: 2
+      database: 1
+
+eureka:
+  instance:
+    hostname: localhost
+    prefer-ip-address: true
+
+  client:
+    service-url:
+      defaultZone: http://localhost:8761/eureka
+    register-with-eureka: true
+    fetch-registry: true
+
+grpc:
+  server:
+    port: 9097
