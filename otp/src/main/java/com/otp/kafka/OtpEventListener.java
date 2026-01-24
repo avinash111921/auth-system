@@ -1,5 +1,8 @@
-package com.otp.service;
+package com.otp.kafka;
 
+import com.otp.service.LoginOtpService;
+import com.otp.service.PasswordResetOtpService;
+import com.otp.service.RegisterOtpService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.kafka.support.Acknowledgment;
@@ -13,7 +16,9 @@ import java.util.Map;
 @RequiredArgsConstructor
 public class OtpEventListener {
 
-    private final OtpService otpService;
+    private final LoginOtpService loginOtpService;
+    private final PasswordResetOtpService passwordResetOtpService;
+    private final RegisterOtpService registerOtpService;
 
     @KafkaListener(
             topics = "auth-event",
@@ -25,12 +30,22 @@ public class OtpEventListener {
             @Header(KafkaHeaders.RECEIVED_KEY) String eventType,
             Acknowledgment ack
     ) {
-        String email = payload.get("email").toString();
-
         switch (eventType) {
-            case "USER_REGISTERED", "USER_LOGIN_OTP_REQUIRED" -> otpService.sendVerificationOtp(email);
+            case "USER_REGISTERED" -> {
+                String email = payload.get("email").toString();
+                registerOtpService.sendVerificationOtp(email);
+            }
 
-            case "PASSWORD_RESET_REQUESTED" -> otpService.sendPasswordResetOtp(email);
+            case "PASSWORD_RESET_REQUESTED" -> {
+                String email = payload.get("email").toString();
+                passwordResetOtpService.sendPasswordResetOtp(email);
+            }
+
+            case "LOGIN_CHALLENGE_REQUIRED" -> {
+                String email = payload.get("email").toString();
+                String challengeId = payload.get("challengeId").toString();
+                loginOtpService.sendLoginOtp(email, challengeId);
+            }
 
             default ->
                     throw new IllegalArgumentException(

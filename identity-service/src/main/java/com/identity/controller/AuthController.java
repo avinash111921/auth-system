@@ -26,6 +26,12 @@ public class AuthController {
         return ResponseEntity.ok("verified");
     }
 
+    @PostMapping("/otp-login")
+    public ResponseEntity<?> otpLogin(@RequestBody OtpLoginRequest req) {
+        authService.verifyLoginOtp(req.getEmail(), req.getOtp(), req.getChallengeId());
+        return ResponseEntity.ok("login_successful");
+    }
+
     @PostMapping("/login")
     public ResponseEntity<?> login(@RequestBody LoginRequest req) {
         return ResponseEntity.ok(authService.login(req));

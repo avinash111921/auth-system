@@ -29,4 +29,15 @@ public class OtpGrpcClient {
         );
         return response.getValid();
     }
+
+    public boolean verifyLoginOtp(String email ,String challengeId, String otp) {
+        VerifyLoginOtpResponse response = otpStub.verifyLoginOtp(
+                VerifyLoginOtpRequest.newBuilder()
+                        .setEmail(email)
+                        .setChallengeId(challengeId)
+                        .setOtp(otp)
+                        .build()
+        );
+        return response.getValid();
+    }
 }

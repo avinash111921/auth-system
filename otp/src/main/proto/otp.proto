@@ -9,6 +9,8 @@ service OtpService {
   rpc verifyOtp (OtpVerifyRequest) returns (OtpVerifyResponse);
 
   rpc VerifyPasswordResetOtp (OtpVerifyRequest) returns (OtpVerifyResponse);
+
+  rpc verifyLoginOtp (VerifyLoginOtpRequest) returns (VerifyLoginOtpResponse);
 }
 
 
@@ -17,7 +19,16 @@ message OtpVerifyRequest {
   string otp = 2;
 }
 
-
 message OtpVerifyResponse {
+  bool valid = 1;
+}
+
+message VerifyLoginOtpRequest {
+  string email = 1;
+  string challengeId = 2;
+  string otp         = 3;
+}
+
+message VerifyLoginOtpResponse {
   bool valid = 1;
 }

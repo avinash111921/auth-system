@@ -8,6 +8,8 @@ import com.identity.kafka.AuthEventProducer;
 import com.identity.repo.UserRepository;
 import com.identity.grpc.OtpGrpcClient;
 import com.identity.grpc.TokenGrpcClient;
+import com.identity.util.ChallengeIdGenerator;
+import com.identity.util.LoginChallengeStore;
 import com.risk.grpc.RiskLevel;
 import com.risk.grpc.RiskResponse;
 import lombok.RequiredArgsConstructor;
@@ -28,6 +30,8 @@ public class AuthService {
     private final TokenGrpcClient tokenGrpcClient;
     private final SecurityGrpcClient securityGrpcClient;
     private final AuthEventProducer eventProducer;
+    private final ChallengeIdGenerator challengeIdGenerator;
+    private final LoginChallengeStore loginChallengeStore;
 
     public UserResponse register(RegisterRequest req) {
 
@@ -50,12 +54,10 @@ public class AuthService {
         User finalUser = user;
 
         eventProducer.publish(
-                "USER_REGISTERED",
-                new HashMap <String, Object>(){{
-                    put("userId", finalUser.getId());
-                    put("email", finalUser.getEmail());
-                }}
-        );
+                "USER_REGISTERED", Map.of(
+                "userId", finalUser.getId(),
+                "email", finalUser.getEmail()
+        ));
 
         return UserResponse.builder()
                 .id(String.valueOf(user.getId()))
@@ -84,7 +86,6 @@ public class AuthService {
         user.setVerified(true);
 
         userRepository.save(user);
-
     }
 
     public Object login(LoginRequest req) {
@@ -97,11 +98,12 @@ public class AuthService {
         if (!user.isVerified()) throw new IllegalStateException("not_verified");
         if (user.isLocked()) throw new IllegalStateException("account_locked");
 
-
         boolean matches = securityGrpcClient.verifyPassword(req.getPassword(), user.getPasswordHash());
 
         if (!matches) {
-            riskGrpcClient.recordFailure(user.getId().toString());
+            eventProducer.publish("LOGIN_FAILED", Map.of(
+                    "userId", user.getId()
+            ));
             throw new IllegalArgumentException("invalid_credentials");
         }
 
@@ -114,7 +116,6 @@ public class AuthService {
         if (risk.getLevel() == RiskLevel.HIGH) {
             user.setLocked(true);
             userRepository.save(user);
-
             eventProducer.publish("HIGH_RISK_LOGIN", Map.of(
                     "userId", user.getId(),
                     "ip", req.getIp(),
@@ -124,30 +125,77 @@ public class AuthService {
         }
 
         if (risk.getLevel() == RiskLevel.MEDIUM) {
-            eventProducer.publish(
-                    "USER_LOGIN_OTP_REQUIRED",
-                    new HashMap <String, Object>(){{
-                        put("userId", user.getId());
-                        put("email", user.getEmail());
-                    }}
+
+            String challengeId = challengeIdGenerator.generate();
+
+            LoginChallenge challenge = new LoginChallenge(
+                    challengeId,
+                    user.getId().toString(),
+                    req.getDeviceFingerprint(),
+                    req.getIp(),
+                    "OTP_PENDING"
             );
+
+            loginChallengeStore.save(challenge);
+
+            eventProducer.publish("LOGIN_CHALLENGE_REQUIRED", Map.of(
+                    "challengeId", challengeId,
+                    "userId", user.getId(),
+                    "email", user.getEmail()
+            ));
+
             return Map.of(
                     "status", "OTP_REQUIRED",
-                    "message", "verify_additional_step"
+                    "challengeId", challengeId,
+                    "message", "additional_verification_required"
             );
         }
+        return issueToken(user, req);
+    }
 
-        riskGrpcClient.trustContext(
+    public TokenResponse verifyLoginOtp (String email,String otp,String challengeId) {
+        Optional<User> opt = userRepository.findByEmail(email);
+
+        if (opt.isEmpty()) {
+            throw new IllegalArgumentException("user_not_found");
+        }
+
+        boolean ok = otpGrpcClient.verifyLoginOtp(email, otp, challengeId);
+
+        if(!ok){
+            throw new IllegalArgumentException("invalid_otp");
+        }
+
+        User user = opt.get();
+
+        LoginChallenge challenge = loginChallengeStore.get(challengeId);
+
+        if(challenge==null || !challenge.getUserId().equals(user.getId().toString())) {
+            throw new IllegalArgumentException("invalid_challenge");
+        }
+        loginChallengeStore.delete(challengeId);
+        return issueToken(user,new LoginRequest(
+                email,
+                "",
+                challenge.getDeviceFingerprint(),
+                challenge.getIp()
+        ));
+    }
+    private TokenResponse issueToken(User user,LoginRequest req){
+        var tokenResponse = tokenGrpcClient.issueToken(
                 user.getId().toString(),
-                req.getDeviceFingerprint(),
-                req.getIp()
+                req.getDeviceFingerprint()
         );
 
         user.setDeviceFingerprint(req.getDeviceFingerprint());
         user.setLastLoginIp(req.getIp());
         userRepository.save(user);
 
-        var tokenResponse = tokenGrpcClient.issueToken(String.valueOf(user.getId()), req.getDeviceFingerprint());
+        eventProducer.publish("LOGIN_SUCCESS", Map.of(
+                "userId", user.getId(),
+                "ip", req.getIp(),
+                "deviceFingerprint", req.getDeviceFingerprint()
+        ));
 
         return new TokenResponse(
                 tokenResponse.getAccessToken(),

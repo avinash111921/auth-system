@@ -25,26 +25,7 @@ public class OtpService {
     private long ttl;
     private static final int MAX_ATTEMPTS = 5;
 
-    public void sendVerificationOtp(String email) {
-        generateAndSendOtp(email, OtpType.VERIFICATION);
-    }
-
-    public boolean verifyOtp(String email, String otp) {
-        return verifyOtp(email, otp, OtpType.VERIFICATION);
-    }
-
-    public void sendPasswordResetOtp(String email) {
-        generateAndSendOtp(email, OtpType.PASSWORD_RESET);
-    }
-
-    public boolean verifyPasswordResetOtp(String email, String otp) {
-        return verifyOtp(email, otp, OtpType.PASSWORD_RESET);
-    }
-
-
-    private boolean verifyOtp(String email, String otp, OtpType type) {
-
-        String key = buildKey(email, type);
+    public boolean verifyOtp(String key, String otp) {
 
         String storedHash = redisTemplate.opsForValue().get(key + ":hash");
         String attemptsStr = redisTemplate.opsForValue().get(key + ":attempts");
@@ -60,6 +41,7 @@ public class OtpService {
         }
 
         int attempts = attemptsStr == null ? 0 : Integer.parseInt(attemptsStr);
+
         if (attempts >= MAX_ATTEMPTS) {
             deleteOtp(key);
             throw new IllegalStateException("Too many attempts");
@@ -76,17 +58,34 @@ public class OtpService {
 
     public void generateAndSendOtp(String email, OtpType type) {
         String otp = generator.generate();
-        saveOtp(email, otp, type);
+        String key = buildKey(email, type);
+        saveOtp(otp, key);
         emailService.send(email, otp);
     }
 
-    private void saveOtp(String email, String otp, OtpType type) {
+    public void generateAndSendLoginOtp(String email,String challengeId){
+        String otp = generator.generate();
+        String key = buildLoginKey(challengeId);
+        saveOtp(otp,key);
+        emailService.send(email, otp);
+    }
 
-        String key = buildKey(email, type);
+    private void saveOtp(String otp,String key) {
+
         long expiry = Instant.now().getEpochSecond() + ttl;
 
-        redisTemplate.opsForValue().set(key + ":hash", hash(otp), ttl, TimeUnit.SECONDS);
-        redisTemplate.opsForValue().set(key + ":attempts", "0", ttl, TimeUnit.SECONDS);
+        redisTemplate.opsForValue().set(
+                key + ":hash",
+                hash(otp),
+                ttl,
+                TimeUnit.SECONDS
+        );
+        redisTemplate.opsForValue().set(
+                key + ":attempts",
+                "0",
+                ttl,
+                TimeUnit.SECONDS
+        );
         redisTemplate.opsForValue().set(
                 key + ":expiry",
                 String.valueOf(expiry),
@@ -101,8 +100,12 @@ public class OtpService {
         redisTemplate.delete(key + ":expiry");
     }
 
-    private String buildKey(String email, OtpType type) {
+    public String buildKey(String email, OtpType type) {
         return "otp:" + type.name() + ":" + email.toLowerCase();
+    }
+
+    public String buildLoginKey(String challengeId){
+        return "otp:LOGIN" + challengeId;
     }
 
     private String hash(String otp) {
@@ -114,4 +117,5 @@ public class OtpService {
             throw new IllegalStateException("OTP hashing failed", e);
         }
     }
+
 }
