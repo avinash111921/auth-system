@@ -153,7 +153,7 @@ public class AuthService {
         return issueToken(user, req);
     }
 
-    public TokenResponse verifyLoginOtp (String email,String otp,String challengeId) {
+    public void verifyLoginOtp (String email, String otp, String challengeId) {
         Optional<User> opt = userRepository.findByEmail(email);
 
         if (opt.isEmpty()) {
@@ -174,7 +174,7 @@ public class AuthService {
             throw new IllegalArgumentException("invalid_challenge");
         }
         loginChallengeStore.delete(challengeId);
-        return issueToken(user,new LoginRequest(
+        issueToken(user, new LoginRequest(
                 email,
                 "",
                 challenge.getDeviceFingerprint(),

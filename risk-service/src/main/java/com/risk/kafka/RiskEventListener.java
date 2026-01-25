@@ -26,12 +26,10 @@ public class RiskEventListener {
             @Header(KafkaHeaders.RECEIVED_KEY) String eventType,
             Acknowledgment ack
     ) {
-        switch (eventType) {
-
-            case "LOGIN_FAILED" -> {
-                String userId = payload.get("userId").toString();
-                riskEngine.recordFailure(userId);
-            }
+        if( eventType.equals("LOGIN_FAILED")) {
+            String userId = payload.get("userId").toString();
+            riskEngine.recordFailure(userId);
+            ack.acknowledge();
         }
     }
 }

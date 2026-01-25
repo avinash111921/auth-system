@@ -15,6 +15,13 @@ public class RedisConfig {
     public RedisConnectionFactory redisConnectionFactory() {
         return new LettuceConnectionFactory();
     }
+
+    /* Lettuce ->
+        Non-blocking
+        Thread-safe
+        Default Redis client in Spring Boot
+    */
+
     @Bean
     public RedisTemplate<String, Object> redisTemplate(
             RedisConnectionFactory connectionFactory

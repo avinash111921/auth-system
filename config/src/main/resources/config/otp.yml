@@ -32,6 +32,11 @@ spring:
       host: redis_container
       port: 6379
       database: 1
+      lettuce:
+        pool:
+          max-active: 16
+          max-idle: 8
+          min-idle: 2
 
 otp:
   ttl: 300

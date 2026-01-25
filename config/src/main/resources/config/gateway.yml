@@ -41,18 +41,17 @@ spring:
         - id : security
           uri: lb://security
           predicates:
-            - Path=/api/security/**
+            - Path=/security/**
 
         - id : risk-service
           uri: lb://risk-service
           predicates:
-            - Path=/api/risk/**
+            - Path=/risk/**
 
 eureka:
   instance:
     hostname: localhost
     prefer-ip-address: true
-
   client:
     service-url:
       defaultZone: http://localhost:8761/eureka

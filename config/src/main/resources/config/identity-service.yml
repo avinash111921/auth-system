@@ -35,7 +35,6 @@ spring:
       value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
       acks: all
       retries: 3
-
     properties:
       spring.json.add.type.headers: false
 
@@ -67,3 +66,9 @@ eureka:
       defaultZone: http://localhost:8761/eureka
     register-with-eureka: true
     fetch-registry: true
+
+
+# Producer sends message
+#Leader broker writes it
+#All ISR replicas replicate it
+#✅ ACK sent back to producer
