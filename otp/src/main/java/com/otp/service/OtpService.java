@@ -29,15 +29,9 @@ public class OtpService {
 
         String storedHash = redisTemplate.opsForValue().get(key + ":hash");
         String attemptsStr = redisTemplate.opsForValue().get(key + ":attempts");
-        String expiryStr = redisTemplate.opsForValue().get(key + ":expiry");
 
-        if (storedHash == null || expiryStr == null) {
+        if (storedHash == null) {
             throw new IllegalStateException("OTP expired or not found");
-        }
-
-        if (Instant.now().getEpochSecond() > Long.parseLong(expiryStr)) {
-            deleteOtp(key);
-            throw new IllegalStateException("OTP expired");
         }
 
         int attempts = attemptsStr == null ? 0 : Integer.parseInt(attemptsStr);
@@ -86,18 +80,11 @@ public class OtpService {
                 ttl,
                 TimeUnit.SECONDS
         );
-        redisTemplate.opsForValue().set(
-                key + ":expiry",
-                String.valueOf(expiry),
-                ttl,
-                TimeUnit.SECONDS
-        );
     }
 
     private void deleteOtp(String key) {
         redisTemplate.delete(key + ":hash");
         redisTemplate.delete(key + ":attempts");
-        redisTemplate.delete(key + ":expiry");
     }
 
     public String buildKey(String email, OtpType type) {
@@ -105,7 +92,7 @@ public class OtpService {
     }
 
     public String buildLoginKey(String challengeId){
-        return "otp:LOGIN" + challengeId;
+        return "otp:LOGIN:" + challengeId;
     }
 
     private String hash(String otp) {
