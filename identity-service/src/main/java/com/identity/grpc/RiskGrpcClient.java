@@ -19,22 +19,4 @@ public class RiskGrpcClient {
                         .build()
         );
     }
-
-    public void recordFailure(String userId) {
-        stub.recordFailure(
-                FailureRequest.newBuilder()
-                        .setUserId(userId)
-                        .build()
-        );
-    }
-
-    public void trustContext(String userId, String fp, String ip) {
-        stub.trustContext(
-                TrustRequest.newBuilder()
-                        .setUserId(userId)
-                        .setDeviceFingerprint(fp)
-                        .setIp(ip)
-                        .build()
-        );
-    }
 }

@@ -68,16 +68,34 @@ public class OtpGrpcService extends OtpServiceGrpc.OtpServiceImplBase {
             VerifyLoginOtpRequest request,
             StreamObserver<VerifyLoginOtpResponse> responseObserver
     ) {
-      boolean valid = loginOtpService.verifyLoginOtp(
-              request.getOtp(),
-              request.getChallengeId()
-      );
+        try {
+            boolean valid = loginOtpService.verifyLoginOtp(
+                    request.getOtp(),
+                    request.getChallengeId()
+            );
 
-      responseObserver.onNext(
-              VerifyLoginOtpResponse.newBuilder()
-                      .setValid(valid)
-                      .build()
-      );
-      responseObserver.onCompleted();
+            responseObserver.onNext(
+                    VerifyLoginOtpResponse.newBuilder()
+                            .setValid(valid)
+                            .build()
+            );
+            responseObserver.onCompleted();
+
+        } catch (IllegalStateException e) {
+            responseObserver.onError(
+                    Status.FAILED_PRECONDITION
+                            .withDescription(e.getMessage())
+                            .asRuntimeException()
+            );
+
+        } catch (IllegalArgumentException e) {
+            responseObserver.onError(
+                    Status.INVALID_ARGUMENT
+                            .withDescription(e.getMessage())
+                            .asRuntimeException()
+            );
+
+        }
     }
+
 }

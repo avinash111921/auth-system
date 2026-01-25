@@ -53,6 +53,10 @@ grpc:
         address: discovery:///security
         negotiationType: plaintext
 
+    risk-service:
+      address: discovery:///risk-service
+      negotiationType: plaintext
+
 eureka:
   instance:
     hostname: localhost

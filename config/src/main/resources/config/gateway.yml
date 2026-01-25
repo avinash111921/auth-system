@@ -43,6 +43,11 @@ spring:
           predicates:
             - Path=/api/security/**
 
+        - id : risk-service
+          uri: lb://risk-service
+          predicates:
+            - Path=/api/risk/**
+
 eureka:
   instance:
     hostname: localhost

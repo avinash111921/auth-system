@@ -4,9 +4,9 @@ import com.risk.service.RiskEngine;
 import com.risk.util.RiskCalculator;
 import io.grpc.stub.StreamObserver;
 import lombok.RequiredArgsConstructor;
-import org.springframework.stereotype.Service;
+import net.devh.boot.grpc.server.service.GrpcService;
 
-@Service
+@GrpcService
 @RequiredArgsConstructor
 public class RiskGrpcService extends RiskServiceGrpc.RiskServiceImplBase {
 
