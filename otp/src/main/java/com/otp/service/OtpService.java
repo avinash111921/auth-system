@@ -26,12 +26,9 @@ public class OtpService {
     private static final int MAX_ATTEMPTS = 5;
 
     public boolean verifyOtp(String key, String otp) {
-        System.out.println("VERIFY OTP KEY = " + key);
 
         String storedHash = redisTemplate.opsForValue().get(key + ":hash");
         String attemptsStr = redisTemplate.opsForValue().get(key + ":attempts");
-
-        System.out.println("stored hash " + storedHash);
 
         if (storedHash == null) {
             throw new IllegalStateException("OTP expired or not found");
