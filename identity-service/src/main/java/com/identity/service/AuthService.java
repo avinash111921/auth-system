@@ -12,6 +12,8 @@ import com.identity.util.ChallengeIdGenerator;
 import com.identity.util.LoginChallengeStore;
 import com.risk.grpc.RiskLevel;
 import com.risk.grpc.RiskResponse;
+import com.token_service.grpc.IssueTokenResponse;
+import com.token_service.grpc.RevokeResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -93,7 +95,6 @@ public class AuthService {
         User user = userRepository.findByEmail(req.getEmail())
                 .orElseThrow(() -> new IllegalArgumentException("invalid_credentials"));
 
-
         if (!user.isEnabled()) throw new IllegalStateException("account_disabled");
         if (!user.isVerified()) throw new IllegalStateException("not_verified");
         if (user.isLocked()) throw new IllegalStateException("account_locked");
@@ -102,7 +103,9 @@ public class AuthService {
 
         if (!matches) {
             eventProducer.publish("LOGIN_FAILED", Map.of(
-                    "userId", user.getId()
+                    "userId", user.getId(),
+                    "ip", req.getIp(),
+                    "deviceFingerprint", req.getDeviceFingerprint()
             ));
             throw new IllegalArgumentException("invalid_credentials");
         }
@@ -125,9 +128,7 @@ public class AuthService {
         }
 
         if (risk.getLevel() == RiskLevel.MEDIUM) {
-
             String challengeId = challengeIdGenerator.generate();
-
             LoginChallenge challenge = new LoginChallenge(
                     challengeId,
                     user.getId().toString(),
@@ -135,7 +136,6 @@ public class AuthService {
                     req.getIp(),
                     "OTP_PENDING"
             );
-
             loginChallengeStore.save(challenge);
 
             eventProducer.publish("LOGIN_CHALLENGE_REQUIRED", Map.of(
@@ -143,24 +143,28 @@ public class AuthService {
                     "userId", user.getId(),
                     "email", user.getEmail()
             ));
-
             return Map.of(
                     "status", "OTP_REQUIRED",
                     "challengeId", challengeId,
                     "message", "additional_verification_required"
             );
         }
-        return issueToken(user, req);
+        IssueTokenRequest request = new IssueTokenRequest(
+                req.getEmail(),
+                req.getDeviceFingerprint(),
+                req.getIp()
+        );
+        return issueToken(user, request);
     }
 
-    public void verifyLoginOtp (String email, String otp, String challengeId) {
+    public TokenResponse verifyLoginOtp (String email, String otp, String challengeId) {
         Optional<User> opt = userRepository.findByEmail(email);
 
         if (opt.isEmpty()) {
             throw new IllegalArgumentException("user_not_found");
         }
 
-        boolean ok = otpGrpcClient.verifyLoginOtp(email, otp, challengeId);
+        boolean ok = otpGrpcClient.verifyLoginOtp(email,challengeId,otp);
 
         if(!ok){
             throw new IllegalArgumentException("invalid_otp");
@@ -174,17 +178,22 @@ public class AuthService {
             throw new IllegalArgumentException("invalid_challenge");
         }
         loginChallengeStore.delete(challengeId);
-        issueToken(user, new LoginRequest(
+        return issueToken(user, new IssueTokenRequest(
                 email,
-                "",
                 challenge.getDeviceFingerprint(),
                 challenge.getIp()
         ));
     }
-    private TokenResponse issueToken(User user,LoginRequest req){
+    private TokenResponse issueToken(User user,IssueTokenRequest req){
         var tokenResponse = tokenGrpcClient.issueToken(
                 user.getId().toString(),
                 req.getDeviceFingerprint()
+        );
+
+        riskGrpcClient.onLoginSuccess(
+                user.getId().toString(),
+                req.getDeviceFingerprint(),
+                req.getIp()
         );
 
         user.setDeviceFingerprint(req.getDeviceFingerprint());
@@ -200,25 +209,52 @@ public class AuthService {
         return new TokenResponse(
                 tokenResponse.getAccessToken(),
                 tokenResponse.getRefreshToken(),
+                tokenResponse.getAccessJti(),
                 tokenResponse.getExpiresIn()
         );
     }
 
     public void forgotPassword(String email) {
         User user = userRepository.findByEmail(email).orElseThrow(() -> new IllegalArgumentException("user_not_found"));
+
         eventProducer.publish("PASSWORD_RESET_REQUESTED", new HashMap<String,Object>(){{
             put("userId", user.getId());
             put("email", user.getEmail());
         }});
+
     }
 
     @Transactional
     public void resetPassword(String email, String otp, String newPassword) {
         User user = userRepository.findByEmail(email).orElseThrow(() -> new IllegalArgumentException("user_not_found"));
+
         boolean ok = otpGrpcClient.verifyPasswordResetOtp(email, otp);
+
         if (!ok) throw new IllegalArgumentException("invalid_otp");
+
         String newHashPassword = securityGrpcClient.encode(newPassword);
+
         user.setPasswordHash(newHashPassword);
         userRepository.save(user);
+    }
+
+    public TokenResponse refresh(String refreshToken, String deviceHash,String accessJti) {
+        IssueTokenResponse response = tokenGrpcClient.refreshToken(refreshToken, deviceHash,accessJti);
+        return new TokenResponse(
+                response.getAccessToken(),
+                response.getRefreshToken(),
+                response.getAccessJti(),
+                response.getExpiresIn()
+        );
+    }
+
+    public boolean revokeToken(String refreshToken, String deviceHash) {
+        RevokeResponse response = tokenGrpcClient.revokeToken(refreshToken, deviceHash);
+        return response.getSuccess();
+    }
+
+    public boolean revokeAllTokens(String userId) {
+        RevokeResponse response = tokenGrpcClient.revokeAllToken(userId);
+        return response.getSuccess();
     }
 }

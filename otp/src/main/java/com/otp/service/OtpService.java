@@ -26,9 +26,12 @@ public class OtpService {
     private static final int MAX_ATTEMPTS = 5;
 
     public boolean verifyOtp(String key, String otp) {
+        System.out.println("VERIFY OTP KEY = " + key);
 
         String storedHash = redisTemplate.opsForValue().get(key + ":hash");
         String attemptsStr = redisTemplate.opsForValue().get(key + ":attempts");
+
+        System.out.println("stored hash " + storedHash);
 
         if (storedHash == null) {
             throw new IllegalStateException("OTP expired or not found");
@@ -40,7 +43,7 @@ public class OtpService {
             deleteOtp(key);
             throw new IllegalStateException("Too many attempts");
         }
-
+        System.out.println("HASH OTP "+ hash(otp));
         if (!hash(otp).equals(storedHash)) {
             redisTemplate.opsForValue().increment(key + ":attempts");
             return false;
@@ -66,8 +69,7 @@ public class OtpService {
 
     private void saveOtp(String otp,String key) {
 
-        long expiry = Instant.now().getEpochSecond() + ttl;
-
+        System.out.println("SAVING OTP KEY = " + key);
         redisTemplate.opsForValue().set(
                 key + ":hash",
                 hash(otp),

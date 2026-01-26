@@ -1,7 +1,6 @@
 package com.token_service.service;
 
 import com.token_service.config.JwtProperties;
-import com.token_service.entity.RefreshRotationResult;
 import com.token_service.entity.RefreshTokenData;
 import com.token_service.util.TokenHasher;
 import lombok.RequiredArgsConstructor;
@@ -37,15 +36,13 @@ public class RefreshTokenService {
                 TimeUnit.SECONDS
         );
 
-        redisTemplate.opsForSet().add(
-                USER_INDEX + userId,
-                hashed
-        );
+        String userKey = USER_INDEX + userId;
 
+        redisTemplate.opsForSet().add(userKey, hashed);
         return rawToken;
     }
 
-    public RefreshRotationResult rotate(
+    public UUID rotate(
             String rawToken,
             String deviceHash,
             String currentAccessJti
@@ -57,7 +54,7 @@ public class RefreshTokenService {
         RefreshTokenData data = (RefreshTokenData) redisTemplate.opsForValue().get(key);
 
         if (data == null) {
-            throw new RuntimeException("Invalid or expired refresh token");
+            throw new RuntimeException("Refresh token reused or revoked");
         }
 
         if (!data.getDeviceHash().equals(deviceHash)) {
@@ -65,15 +62,14 @@ public class RefreshTokenService {
         }
 
         if (!data.getParentJti().equals(currentAccessJti)) {
-            throw new RuntimeException("Refresh token reuse detected");
+            throw new RuntimeException("Session revoked");
         }
 
         redisTemplate.delete(key);
+
         redisTemplate.opsForSet()
                 .remove(USER_INDEX + data.getUserId(), hashed);
 
-        String newRefreshToken = create(data.getUserId(), deviceHash, currentAccessJti);
-
-        return new RefreshRotationResult(data.getUserId(),newRefreshToken);
+        return data.getUserId();
     }
 }

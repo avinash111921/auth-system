@@ -1,5 +1,6 @@
 package com.risk.grpc;
 
+import com.risk.entity.RiskResult;
 import com.risk.service.RiskEngine;
 import com.risk.util.RiskCalculator;
 import io.grpc.stub.StreamObserver;
@@ -16,20 +17,21 @@ public class RiskGrpcService extends RiskServiceGrpc.RiskServiceImplBase {
     public void assessRisk(RiskRequest req,
                            StreamObserver<RiskResponse> res) {
 
-        int score = engine.calculateRisk(
+        RiskResult result = engine.calculateRisk(
                 req.getUserId(),
                 req.getDeviceFingerprint(),
                 req.getIp()
         );
 
-        RiskLevel level = RiskCalculator.level(score);
+        RiskLevel level = RiskCalculator.level(result.getScore());
 
-        res.onNext(
-                RiskResponse.newBuilder()
-                        .setScore(score)
-                        .setLevel(level)
-                        .build()
-        );
+        RiskResponse response = RiskResponse.newBuilder()
+                .setScore(result.getScore())
+                .setLevel(level)
+                .addAllReasons(result.getReasons())
+                .build();
+
+        res.onNext(response);
         res.onCompleted();
     }
 
@@ -39,21 +41,21 @@ public class RiskGrpcService extends RiskServiceGrpc.RiskServiceImplBase {
 
         engine.recordFailure(req.getUserId());
 
-        res.onNext(Empty.newBuilder().build());
+        res.onNext(Empty.getDefaultInstance());
         res.onCompleted();
     }
 
     @Override
-    public void trustContext(TrustRequest req,
-                             StreamObserver<Empty> res) {
+    public void onLoginSuccess(LoginSuccessRequest req,
+                               StreamObserver<Empty> res) {
 
-        engine.trustContext(
+        engine.onSuccessfulLogin(
                 req.getUserId(),
                 req.getDeviceFingerprint(),
                 req.getIp()
         );
 
-        res.onNext(Empty.newBuilder().build());
+        res.onNext(Empty.getDefaultInstance());
         res.onCompleted();
     }
 }

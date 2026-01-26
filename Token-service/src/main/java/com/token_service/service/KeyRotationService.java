@@ -46,7 +46,7 @@ public class KeyRotationService {
 
         keyStore.getAllKeys().forEach((kid, stored) -> {
             boolean expired =
-                    stored.createdAt()
+                    stored.getCreatedAt()
                             .plusSeconds(retentionSeconds)
                             .isBefore(now);
 

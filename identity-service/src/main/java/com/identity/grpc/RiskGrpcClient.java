@@ -19,4 +19,13 @@ public class RiskGrpcClient {
                         .build()
         );
     }
+    public void onLoginSuccess(String userId, String fp, String ip) {
+        stub.onLoginSuccess(
+                LoginSuccessRequest.newBuilder()
+                        .setUserId(userId)
+                        .setDeviceFingerprint(fp)
+                        .setIp(ip)
+                        .build()
+        );
+    }
 }

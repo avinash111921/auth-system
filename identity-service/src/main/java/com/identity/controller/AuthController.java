@@ -28,8 +28,8 @@ public class AuthController {
 
     @PostMapping("/otp-login")
     public ResponseEntity<?> otpLogin(@RequestBody OtpLoginRequest req) {
-        authService.verifyLoginOtp(req.getEmail(), req.getOtp(), req.getChallengeId());
-        return ResponseEntity.ok("login_successful");
+        TokenResponse response = authService.verifyLoginOtp(req.getEmail(), req.getOtp(), req.getChallengeId());
+        return ResponseEntity.ok(response);
     }
 
     @PostMapping("/login")
@@ -47,5 +47,27 @@ public class AuthController {
     public ResponseEntity<?> resetPassword(@RequestBody ForgetPasswordRequest req) {
         authService.resetPassword(req.getEmail(), req.getOtp(), req.getNewPassword());
         return ResponseEntity.ok("password_changed");
+    }
+
+    @PostMapping("/refresh")
+    public ResponseEntity<?> refreshToken(@RequestBody TokenRefreshRequest req) {
+        TokenResponse tokenResponse = authService.refresh(req.getRefreshToken(), req.getDeviceHash(),req.getAccessJti());
+        return ResponseEntity.ok(tokenResponse);
+    }
+
+    @PostMapping("/logout")
+    public ResponseEntity<?> logout(
+            @RequestBody RevokeTokenRequest req
+    ) {
+        boolean response = authService.revokeToken(req.getRefreshToken(), req.getDeviceHash());
+        return ResponseEntity.ok(response);
+    }
+
+    @PostMapping("/logout-all")
+    public ResponseEntity<?> logoutAll(
+            @RequestBody RevokeAllTokenRequest req
+    ) {
+        boolean response = authService.revokeAllTokens(req.getUserId());
+        return ResponseEntity.ok(response);
     }
 }

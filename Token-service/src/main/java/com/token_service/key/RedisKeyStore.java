@@ -57,7 +57,7 @@ public class RedisKeyStore {
         StoredKey stored = JsonUtils.fromJson(json, StoredKey.class);
 
         try {
-            return RSAKey.parse(stored.jwkJson());
+            return RSAKey.parse(stored.getJwkJson());
         } catch (ParseException e) {
             throw new IllegalStateException("Invalid JWK stored in Redis", e);
         }

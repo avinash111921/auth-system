@@ -13,6 +13,8 @@ public class TokenResponse {
     @NotBlank
     private String refreshToken;
 
+    private String accessJti;
+
     @NotBlank
     private long expiresIn;
 }

@@ -37,7 +37,8 @@ message RevokeAllTokensRequest {
 message IssueTokenResponse {
   string accessToken = 1;
   string refreshToken = 2;
-  int64 expiresIn = 3;
+  string accessJti = 3;
+  int64 expiresIn = 4;
 }
 
 message RevokeResponse {

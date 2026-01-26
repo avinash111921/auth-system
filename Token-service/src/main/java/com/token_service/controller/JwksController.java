@@ -32,7 +32,7 @@ public class JwksController {
 
     private Map<String, Object> toPublicJwk(StoredKey storedKey) {
         try {
-            RSAKey rsaKey = RSAKey.parse(storedKey.jwkJson());
+            RSAKey rsaKey = RSAKey.parse(storedKey.getJwkJson());
             return rsaKey.toPublicJWK().toJSONObject();
         } catch (ParseException e) {
             throw new IllegalStateException(

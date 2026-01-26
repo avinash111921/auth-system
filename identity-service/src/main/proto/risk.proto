@@ -10,7 +10,7 @@ service RiskService {
 
   rpc RecordFailure (FailureRequest) returns (Empty);
 
-  rpc TrustContext (TrustRequest) returns (Empty);
+  rpc OnLoginSuccess (LoginSuccessRequest) returns (Empty);
 }
 
 message RiskRequest {
@@ -19,13 +19,20 @@ message RiskRequest {
   string ip = 3;
 }
 
+message FailureRequest {
+  string userId = 1;
+}
+
+message LoginSuccessRequest {
+  string userId = 1;
+  string deviceFingerprint = 2;
+  string ip = 3;
+}
+
 message RiskResponse {
   RiskLevel level = 1;
   int32 score = 2;
-}
-
-message FailureRequest {
-  string userId = 1;
+  repeated string reasons = 3;
 }
 
 message Empty {}
@@ -34,10 +41,4 @@ enum RiskLevel {
   LOW = 0;
   MEDIUM = 1;
   HIGH = 2;
-}
-
-message TrustRequest {
-  string userId = 1;
-  string deviceFingerprint = 2;
-  string ip = 3;
 }

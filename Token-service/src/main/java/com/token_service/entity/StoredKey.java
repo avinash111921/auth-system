@@ -1,8 +1,15 @@
 package com.token_service.entity;
 
+import lombok.AllArgsConstructor;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+
 import java.time.Instant;
 
-public record StoredKey(
-        String jwkJson,
-        Instant createdAt
-) {}
+@Data
+@AllArgsConstructor
+@NoArgsConstructor
+public class StoredKey {
+    private String jwkJson;
+    private Instant createdAt;
+}

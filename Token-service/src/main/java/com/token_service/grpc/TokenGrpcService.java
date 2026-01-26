@@ -2,7 +2,6 @@ package com.token_service.grpc;
 
 import com.token_service.config.JwtProperties;
 import com.token_service.entity.AccessTokenResult;
-import com.token_service.entity.RefreshRotationResult;
 import com.token_service.service.RefreshTokenService;
 import com.token_service.service.RevokeService;
 import com.token_service.service.TokenService;
@@ -34,17 +33,20 @@ public class TokenGrpcService extends TokenServiceGrpc.TokenServiceImplBase {
             AccessTokenResult accessToken =
                     tokenService.generateAccessToken(userId, deviceHash);
 
+            String accessJti = accessToken.getJti();
+
             String refreshToken =
                     refreshTokenService.create(
                             userId,
                             deviceHash,
-                            accessToken.getJti()
+                            accessJti
                     );
 
             IssueTokenResponse response =
                     IssueTokenResponse.newBuilder()
                             .setAccessToken(accessToken.getToken())
                             .setRefreshToken(refreshToken)
+                            .setAccessJti(accessJti)
                             .setExpiresIn(jwtProperties.getAccessTtl())
                             .build();
 
@@ -67,7 +69,7 @@ public class TokenGrpcService extends TokenServiceGrpc.TokenServiceImplBase {
             StreamObserver<IssueTokenResponse> responseObserver
     ) {
         try {
-            RefreshRotationResult refreshRotationResult =
+            UUID userId =
                     refreshTokenService.rotate(
                             request.getRefreshToken(),
                             request.getDeviceHash(),
@@ -76,16 +78,21 @@ public class TokenGrpcService extends TokenServiceGrpc.TokenServiceImplBase {
 
             AccessTokenResult accessToken =
                     tokenService.generateAccessToken(
-                            refreshRotationResult.getUserId(),
+                            userId,
                             request.getDeviceHash()
                     );
 
-            String newRefreshToken = refreshRotationResult.getRefreshToken();
+            String newRefreshToken = refreshTokenService.create(
+                    userId,
+                    request.getDeviceHash(),
+                    accessToken.getJti()
+            );
 
             IssueTokenResponse response =
                     IssueTokenResponse.newBuilder()
                             .setAccessToken(accessToken.getToken())
                             .setRefreshToken(newRefreshToken)
+                            .setAccessJti(accessToken.getJti())
                             .setExpiresIn(jwtProperties.getAccessTtl())
                             .build();
 
@@ -103,7 +110,10 @@ public class TokenGrpcService extends TokenServiceGrpc.TokenServiceImplBase {
     }
 
     @Override
-    public void revokeToken(RevokeTokenRequest request,StreamObserver<RevokeResponse> responseObserver) {
+    public void revokeToken(
+            RevokeTokenRequest request,
+            StreamObserver<RevokeResponse> responseObserver
+    ) {
         try{
             revokeService.revokeSingle(request.getRefreshToken(),request.getDeviceHash());
             responseObserver.onNext(
