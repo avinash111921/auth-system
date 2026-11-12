@@ -23,8 +23,11 @@ public class RiskEngine {
 
     private static final int FAILURE_THRESHOLD = 3;
     private static final Duration FAILURE_WINDOW = Duration.ofMinutes(15);
+    private static final Duration KNOWN_DEVICE_TTL = Duration.ofDays(90);
+    private static final Duration KNOWN_IP_TTL = Duration.ofDays(30);
+    private static final Duration SEEN_TTL = Duration.ofDays(365);
 
-    public RiskResult calculateRisk(String userId, String deviceFp, String ip) {
+    public RiskResult calculateRisk(String userId, String deviceId, String ip) {
 
         if (isFirstLogin(userId)) {
             return new RiskResult(0, List.of("FIRST_LOGIN_BASELINE"));
@@ -33,7 +36,7 @@ public class RiskEngine {
         int risk = 0;
         List<String> reasons = new ArrayList<>();
 
-        if (isNewDevice(userId, deviceFp)) {
+        if (isNewDevice(userId, deviceId)) {
             risk += NEW_DEVICE_SCORE;
             reasons.add("NEW_DEVICE");
         }
@@ -56,53 +59,64 @@ public class RiskEngine {
         return new RiskResult(risk, reasons);
     }
 
-    public void onSuccessfulLogin(String userId, String deviceFp, String ip) {
-        trustContext(userId, deviceFp, ip);
+    public void onSuccessfulLogin(String userId, String deviceId, String ip) {
+        trustContext(userId, deviceId, ip);
         markUserSeen(userId);
         clearFailures(userId);
     }
 
     public void recordFailure(String userId) {
-        String key = "login:fail:" + userId;
+        String key = failuresKey(userId);
         redis.opsForValue().increment(key);
         redis.expire(key, FAILURE_WINDOW);
     }
 
     private boolean recentFailures(String userId) {
-        String val = redis.opsForValue().get("login:fail:" + userId);
+        String val = redis.opsForValue().get(failuresKey(userId));
         return val != null && Integer.parseInt(val) >= FAILURE_THRESHOLD;
     }
 
     private void clearFailures(String userId) {
-        redis.delete("login:fail:" + userId);
+        redis.delete(failuresKey(userId));
     }
 
-    private void trustContext(String userId, String fp, String ip) {
-        redis.opsForSet().add("known:device:" + userId, fp);
-        redis.opsForSet().add("known:ip:" + userId, ip);
-
-        redis.expire("known:device:" + userId, Duration.ofDays(90));
-        redis.expire("known:ip:" + userId, Duration.ofDays(30));
+    private void trustContext(String userId, String deviceId, String ip) {
+        redis.opsForSet().add(knownDevicesKey(userId), deviceId);
+        redis.opsForSet().add(knownIpsKey(userId), ip);
+        redis.expire(knownDevicesKey(userId), KNOWN_DEVICE_TTL);
+        redis.expire(knownIpsKey(userId), KNOWN_IP_TTL);
     }
 
-    private boolean isNewDevice(String userId, String fp) {
-        return !Boolean.TRUE.equals(
-                redis.opsForSet().isMember("known:device:" + userId, fp)
-        );
+    private boolean isNewDevice(String userId, String deviceId) {
+        return !Boolean.TRUE.equals(redis.opsForSet().isMember(knownDevicesKey(userId), deviceId));
     }
 
     private boolean isNewIp(String userId, String ip) {
-        return !Boolean.TRUE.equals(
-                redis.opsForSet().isMember("known:ip:" + userId, ip)
-        );
+        return !Boolean.TRUE.equals(redis.opsForSet().isMember(knownIpsKey(userId), ip));
     }
 
     private boolean isFirstLogin(String userId) {
-        return !Boolean.TRUE.equals(redis.hasKey("user:seen:" + userId));
+        return !Boolean.TRUE.equals(redis.hasKey(seenKey(userId)));
     }
 
     private void markUserSeen(String userId) {
-        redis.opsForValue().set("user:seen:" + userId, "1");
+        redis.opsForValue().set(seenKey(userId), "1", SEEN_TTL);
+    }
+
+    private static String failuresKey(String userId) {
+        return "risk:fail:" + userId;
+    }
+
+    private static String knownDevicesKey(String userId) {
+        return "risk:known-device:" + userId;
+    }
+
+    private static String knownIpsKey(String userId) {
+        return "risk:known-ip:" + userId;
+    }
+
+    private static String seenKey(String userId) {
+        return "risk:seen:" + userId;
     }
 
     private boolean isOddTime() {
