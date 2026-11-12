@@ -2,6 +2,8 @@ server:
   port: 8083
 
 spring:
+  main:
+    allow-bean-definition-overriding: true
 #  application:
 #    name: otp
 
@@ -22,7 +24,7 @@ spring:
     host: smtp.gmail.com
     port: 587
     username: avinash1921avi@gmail.com
-    password: japk duzr tomb jxjv
+    password: hyzn vxpk semt inop
     properties:
       mail.smtp.auth: true
       mail.smtp.starttls.enable: true

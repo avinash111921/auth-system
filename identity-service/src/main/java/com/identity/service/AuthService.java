@@ -35,10 +35,32 @@ public class AuthService {
     private final ChallengeIdGenerator challengeIdGenerator;
     private final LoginChallengeStore loginChallengeStore;
 
+    @Transactional
     public UserResponse register(RegisterRequest req) {
 
-        if (userRepository.existsByEmail(req.getEmail())) {
-            throw new IllegalArgumentException("email_already_exists");
+        if (req == null || req.getEmail() == null || req.getPassword() == null) {
+            throw new IllegalArgumentException("invalid_request");
+        }
+
+        Optional<User> opt = userRepository.findByEmail(req.getEmail());
+        User user;
+        if (opt.isPresent()) {
+            user = opt.get();
+            if (user.isVerified()) {
+                return buildSuccessResponse();
+            }
+            user.setPasswordHash(securityGrpcClient.encode(req.getPassword()));
+            user.setFullName(req.getFullName());
+            user.setPhoneNumber(req.getPhoneNumber());
+            user = userRepository.save(user);
+
+            eventProducer.publish(
+                    "USER_REGISTERED", Map.of(
+                            "userId", user.getUserId().toString(),
+                            "email", user.getEmail()
+                    )
+            );
+            return buildSuccessResponse();
         }
 
         String passwordHash = securityGrpcClient.encode(req.getPassword());
@@ -57,16 +79,16 @@ public class AuthService {
 
         eventProducer.publish(
                 "USER_REGISTERED", Map.of(
-                "userId", finalUser.getId(),
-                "email", finalUser.getEmail()
-        ));
+                        "userId", user.getUserId().toString(),
+                        "email", user.getEmail()
+                )
+        );
+        return buildSuccessResponse();
+    }
 
+    private UserResponse buildSuccessResponse() {
         return UserResponse.builder()
-                .id(String.valueOf(user.getId()))
-                .email(user.getEmail())
-                .fullName(user.getFullName())
-                .verified(user.isVerified())
-                .enabled(user.isEnabled())
+                .message("If the details are valid, a verification email has been sent.")
                 .build();
     }
 

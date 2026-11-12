@@ -1,27 +1,23 @@
 package com.identity.dto;
 
 
-import jakarta.validation.constraints.Email;
-import jakarta.validation.constraints.NotBlank;
+import com.fasterxml.jackson.annotation.JsonInclude;
 import lombok.Builder;
 import lombok.Data;
 
 @Data
-@Builder
+@Builder@JsonInclude(JsonInclude.Include.NON_NULL)
+
 public class UserResponse {
-    @NotBlank
     private String id;
 
-    @Email
-    @NotBlank
     private String email;
 
-    @NotBlank
     private String fullName;
 
-    @NotBlank
-    private boolean verified;
+    private Boolean verified;
 
-    @NotBlank
-    private boolean enabled;
+    private Boolean enabled;
+
+    private String message;
 }
