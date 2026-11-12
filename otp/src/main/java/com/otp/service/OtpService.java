@@ -1,107 +1,97 @@
 package com.otp.service;
 
-import com.otp.dto.OtpType;
-import com.otp.util.OtpGenerator;
-import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.core.io.ClassPathResource;
 import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.data.redis.core.script.RedisScript;
 import org.springframework.stereotype.Service;
 
+import javax.crypto.Mac;
+import javax.crypto.spec.SecretKeySpec;
 import java.nio.charset.StandardCharsets;
-import java.security.MessageDigest;
-import java.time.Instant;
+import java.security.GeneralSecurityException;
+import java.security.SecureRandom;
+import java.time.Duration;
 import java.util.Base64;
-import java.util.concurrent.TimeUnit;
+import java.util.List;
+import java.util.Locale;
+
+/**
+    Codes are stored as HMAC-SHA256 under a server secret: with only a million possible codes,
+    a plain hash would be reversed instantly by anyone who can read Redis.
+    Neither codes nor recipients are ever logged.
+ */
 
 @Service
-@RequiredArgsConstructor
+@Slf4j
 public class OtpService {
 
-    private final OtpGenerator generator;
-    private final EmailService emailService;
-    private final StringRedisTemplate redisTemplate;
-
-    @Value("${otp.ttl}")
-    private long ttl;
     private static final int MAX_ATTEMPTS = 5;
+    private static final int MAX_SENDS_PER_RECIPIENT_PER_HOUR=10;
+    private static final RedisScript<Long> VERIFY = RedisScript.of(new ClassPathResource("redis/otp-verify.lua"), Long.class);
+    private static final SecureRandom RANDOM = new SecureRandom();
 
-    public boolean verifyOtp(String key, String otp) {
+    private final StringRedisTemplate redis;
+    private final EmailService email;
+    private final Duration ttl;
+    private final SecretKeySpec hmacKey;
 
-        String storedHash = redisTemplate.opsForValue().get(key + ":hash");
-        String attemptsStr = redisTemplate.opsForValue().get(key + ":attempts");
-
-        if (storedHash == null) {
-            throw new IllegalStateException("OTP expired or not found");
+    public OtpService(StringRedisTemplate redis, EmailService email,
+                      @Value("${otp.ttl}") long ttlSeconds,
+                      @Value("${otp.hmac-secret}") String hmacSecret) {
+        byte[] secret = hmacSecret.getBytes(StandardCharsets.UTF_8);
+        if (secret.length < 32) {
+            throw new IllegalStateException("otp.hmac-secret must be at least 32 bytes");
         }
+        this.redis = redis;
+        this.email = email;
+        this.ttl = Duration.ofSeconds(ttlSeconds);
+        this.hmacKey = new SecretKeySpec(secret, "HmacSHA256");
+    }
 
-        int attempts = attemptsStr == null ? 0 : Integer.parseInt(attemptsStr);
-
-        if (attempts >= MAX_ATTEMPTS) {
-            deleteOtp(key);
-            throw new IllegalStateException("Too many attempts");
+    public void issue(OtpPurpose purpose, String subject, String recipient) {
+        if (!withinSendLimit(recipient)) {
+            log.warn("OTP send limit reached for a recipient; {} code not sent", purpose);
+            return;
         }
-        System.out.println("HASH OTP "+ hash(otp));
-        if (!hash(otp).equals(storedHash)) {
-            redisTemplate.opsForValue().increment(key + ":attempts");
+        String code = "%06d".formatted(RANDOM.nextInt(1_000_000));
+        String base = baseKey(purpose, subject);
+        redis.delete(base + ":attempts");
+        redis.opsForValue().set(base + ":hash", hmac(code), ttl);
+        email.sendCode(recipient, purpose, code, ttl);
+    }
+
+    public boolean verify(OtpPurpose purpose, String subject, String code) {
+        if (subject.isBlank() || code.isBlank()) {
             return false;
         }
-
-        deleteOtp(key);
-        return true;
+        String base = baseKey(purpose, subject);
+        Long result = redis.execute(VERIFY, List.of(base + ":hash", base + ":attempts"),
+                hmac(code), String.valueOf(MAX_ATTEMPTS));
+        return Long.valueOf(1).equals(result);
     }
 
-    public void generateAndSendOtp(String email, OtpType type) {
-        String otp = generator.generate();
-        String key = buildKey(email, type);
-        saveOtp(otp, key);
-        emailService.send(email, otp);
+    private boolean withinSendLimit(String recipient) {
+        String key = "otp:sends:" + recipient.toLowerCase(Locale.ROOT);
+        Long sends = redis.opsForValue().increment(key);
+        if (sends != null && sends == 1) {
+            redis.expire(key, Duration.ofHours(1));
+        }
+        return sends != null && sends <= MAX_SENDS_PER_RECIPIENT_PER_HOUR;
     }
 
-    public void generateAndSendLoginOtp(String email,String challengeId){
-        String otp = generator.generate();
-        String key = buildLoginKey(challengeId);
-        saveOtp(otp,key);
-        emailService.send(email, otp);
+    private static String baseKey(OtpPurpose purpose, String subject) {
+        return "otp:{" + purpose.name() + ":" + subject + "}";
     }
 
-    private void saveOtp(String otp,String key) {
-
-        System.out.println("SAVING OTP KEY = " + key);
-        redisTemplate.opsForValue().set(
-                key + ":hash",
-                hash(otp),
-                ttl,
-                TimeUnit.SECONDS
-        );
-        redisTemplate.opsForValue().set(
-                key + ":attempts",
-                "0",
-                ttl,
-                TimeUnit.SECONDS
-        );
-    }
-
-    private void deleteOtp(String key) {
-        redisTemplate.delete(key + ":hash");
-        redisTemplate.delete(key + ":attempts");
-    }
-
-    public String buildKey(String email, OtpType type) {
-        return "otp:" + type.name() + ":" + email.toLowerCase();
-    }
-
-    public String buildLoginKey(String challengeId){
-        return "otp:LOGIN:" + challengeId;
-    }
-
-    private String hash(String otp) {
+    private String hmac(String code) {
         try {
-            MessageDigest md = MessageDigest.getInstance("SHA-256");
-            byte[] digest = md.digest(otp.getBytes(StandardCharsets.UTF_8));
-            return Base64.getEncoder().encodeToString(digest);
-        } catch (Exception e) {
-            throw new IllegalStateException("OTP hashing failed", e);
+            Mac mac = Mac.getInstance("HmacSHA256");
+            mac.init(hmacKey);
+            return Base64.getEncoder().encodeToString(mac.doFinal(code.getBytes(StandardCharsets.UTF_8)));
+        } catch (GeneralSecurityException e) {
+            throw new IllegalStateException("HMAC-SHA256 unavailable", e);
         }
     }
-
 }
