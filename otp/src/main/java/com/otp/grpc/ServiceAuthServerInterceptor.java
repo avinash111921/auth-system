@@ -18,9 +18,10 @@ import java.util.Set;
 import java.util.stream.Collectors;
 
 /**
- * Rejects any call that isn't signed by a known internal caller, or that targets a gRPC service
- * the caller isn't allowed to use. The signature is HMAC-SHA256 over
- * "caller\nfull-method-name\nepoch-seconds", produced by the caller's client interceptor.
+    Rejects any call that isn't signed by a known internal caller,
+    or that targets a gRPC service the caller isn't allowed to use.
+    The signature is HMAC-SHA256 over "caller\n full-method-name\n epoch-seconds",
+    produced by the caller's client interceptor.
  */
 class ServiceAuthServerInterceptor implements ServerInterceptor {
 
