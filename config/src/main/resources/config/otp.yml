@@ -2,56 +2,55 @@ server:
   port: 8083
 
 spring:
-  main:
-    allow-bean-definition-overriding: true
-#  application:
-#    name: otp
-
   kafka:
     bootstrap-servers : localhost:9092
     consumer:
-        group-id: otp-group
+        group-id: otp-service
         auto-offset-reset: earliest
         enable-auto-commit: false
         key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
-        value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
-
-    properties:
-      spring.json.trusted.packages: "*"
-      spring.json.value.default.type: java.util.HashMap
+        value-deserializer: org.apache.kafka.common.serialization.StringDeserialize
 
   mail:
     host: smtp.gmail.com
     port: 587
-    username: avinash1921avi@gmail.com
-    password: hyzn vxpk semt inop
+    username: ${SMTP_USERNAME}
+    password: ${SMTP_PASSWORD}
     properties:
       mail.smtp.auth: true
       mail.smtp.starttls.enable: true
 
   data:
     redis:
-      host: redis_container
+      host: ${REDIS_HOST:localhost}
       port: 6379
+      timeout : 2s
       database: 1
-      lettuce:
-        pool:
-          max-active: 16
-          max-idle: 8
-          min-idle: 2
+#      lettuce:
+#        pool:
+#          max-active: 16
+#          max-idle: 8
+#          min-idle: 2
 
 otp:
   ttl: 300
+  hmac-secret: ${OTP_HMAC_SECRET}
 
 grpc:
   server:
     port: 9093
 
+service-auth:
+  trusted-callers:
+    identity-service:
+      secret: ${SERVICE_AUTH_IDENTITY_SECRET}
+      allowed-services:
+        - auth.otp.v1.OtpService
+
 eureka:
   instance:
     metadata-map:
       grpc.port: 9093
-
   client:
     service-url:
       defaultZone: http://localhost:8761/eureka

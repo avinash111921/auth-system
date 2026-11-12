@@ -23,30 +23,30 @@ spring:
           predicates:
             - Path=/api/auth/**
 
-        - id : otp-service
-          uri: lb://otp-service
-          predicates:
-            - Path=/otp/**
+#        - id : otp-service
+#          uri: lb://otp-service
+#          predicates:
+#            - Path=/otp/**
 
-        - id: token-service
-          uri: lb://token-service
-          predicates:
-            - Path=/token/**
+#        - id: token-service
+#          uri: lb://token-service
+#          predicates:
+#            - Path=/token/**
 
         - id: jwks
           uri: lb://token-service
           predicates:
-            - Path=/.well-known/**
+            - Path=/.well-known/jwks.json
 
-        - id : security
-          uri: lb://security
-          predicates:
-            - Path=/security/**
-
-        - id : risk-service
-          uri: lb://risk-service
-          predicates:
-            - Path=/risk/**
+#        - id : security
+#          uri: lb://security
+#          predicates:
+#            - Path=/security/**
+#
+#        - id : risk-service
+#          uri: lb://risk-service
+#          predicates:
+#            - Path=/risk/**
 
 eureka:
   instance:

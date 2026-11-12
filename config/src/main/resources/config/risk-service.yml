@@ -4,40 +4,41 @@ server:
 spring:
   data:
     redis:
-      host: redis_container
+      host: ${REDIS_HOST:localhost}
       port: 6379
-      timeout: 2000ms
-      lettuce:
-        pool:
-          max-active: 16
-          max-idle: 8
-          min-idle: 2
-      database: 1
+      timeout: 2s
+#      lettuce:
+#        pool:
+#          max-active: 16
+#          max-idle: 8
+#          min-idle: 2
+      database: 3
 
   kafka:
     bootstrap-servers: localhost:9092
     consumer:
-      group-id: risk-service-group
+      group-id: risk-service
       auto-offset-reset: earliest
       enable-auto-commit: false
       key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
-      value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
+      value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
 
-    properties:
-      spring.json.trusted.packages: "*"
-      spring.json.value.default.type: java.util.HashMap
+grpc:
+  server:
+    port: 9097
 
+service-auth:
+  trusted-callers:
+    identity-service:
+      secret: ${SERVICE_AUTH_IDENTITY_SECRET}
+      allowed-services:
+        - auth.otp.v1.RiskService
 eureka:
   instance:
     hostname: localhost
     prefer-ip-address: true
-
   client:
     service-url:
       defaultZone: http://localhost:8761/eureka
     register-with-eureka: true
     fetch-registry: true
-
-grpc:
-  server:
-    port: 9097

@@ -2,18 +2,16 @@ server:
   port: 8082
 
 spring:
-#  application:
-#    name: token-service
   data:
     redis:
-      host: redis_container
+      host: ${REDIS_HOST:localhost}
       port: 6379
-      timeout: 2000ms
-      lettuce:
-        pool:
-          max-active: 16
-          max-idle: 8
-          min-idle: 2
+      timeout: 2s
+#      lettuce:
+#        pool:
+#          max-active: 16
+#          max-idle: 8
+#          min-idle: 2
       database: 0
 
 jwt:
@@ -38,7 +36,6 @@ eureka:
   instance:
     hostname: localhost
     prefer-ip-address: true
-
   client:
     service-url:
       defaultZone: http://localhost:8761/eureka
@@ -48,3 +45,10 @@ eureka:
 grpc:
   server:
     port: 9091
+
+service-auth:
+  trusted-callers:
+    identity-service:
+      secret: ${SERVICE_AUTH_IDENTITY_SECRET}
+      allowed-services:
+        - auth.otp.v1.TokenService

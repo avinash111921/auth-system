@@ -2,28 +2,26 @@ server:
   port: 8081
 
 spring:
-#  application:
-#    name: identity-service
-
   data:
     redis:
-      host: redis_container
+      host: ${REDIS_HOST:localhost}
       port: 6379
-      timeout: 2000ms
-      lettuce:
-        pool:
-          max-active: 16
-          max-idle: 8
-          min-idle: 2
+      timeout: 2s
+#      lettuce:
+#        pool:
+#          max-active: 16
+#          max-idle: 8
+#          min-idle: 2
       database: 2
 
   datasource:
     url: jdbc:postgresql://localhost:5432/auth
-    username: avi
-    password: avi1921
+    username: {DB_USERNAME}
+    password: {DB_PASSWORD}
     driver-class-name: org.postgresql.Driver
 
   jpa:
+    open-in-view: false
     hibernate:
       ddl-auto: update
     show-sql: false
@@ -32,26 +30,33 @@ spring:
     bootstrap-servers: localhost:9092
     producer:
       key-serializer: org.apache.kafka.common.serialization.StringSerializer
-      value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
+      value-serializer: org.apache.kafka.common.serialization.StringSerializer
       acks: all
-      retries: 3
-    properties:
-      spring.json.add.type.headers: false
+
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          jwk-set-uri: http://localhost:8082/.well-known/jwks.json
+
+auth:
+  jwt:
+    issuer : auth-platform
+  device-cookie:
+    secret: ${SERVICE_AUTH_IDENTITY_SECRET}
+
+service-auth:
+  service-name: identity-service
+  secret: ${SERVICE_AUTH_IDENTITY_SECRET}
 
 grpc:
   client:
     otp:
       address: discovery:///otp
       negotiationType: plaintext
-
     token-service:
       address: discovery:///token-service
       negotiationType: plaintext
-
-    security:
-        address: discovery:///security
-        negotiationType: plaintext
-
     risk-service:
       address: discovery:///risk-service
       negotiationType: plaintext
