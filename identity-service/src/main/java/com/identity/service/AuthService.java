@@ -51,12 +51,11 @@ public class AuthService {
             }
             user.setPasswordHash(securityGrpcClient.encode(req.getPassword()));
             user.setFullName(req.getFullName());
-            user.setPhoneNumber(req.getPhoneNumber());
             user = userRepository.save(user);
 
             eventProducer.publish(
                     "USER_REGISTERED", Map.of(
-                            "userId", user.getUserId().toString(),
+                            "userId", user.getId().toString(),
                             "email", user.getEmail()
                     )
             );
@@ -65,7 +64,7 @@ public class AuthService {
 
         String passwordHash = securityGrpcClient.encode(req.getPassword());
 
-        User user = User.builder()
+        user = User.builder()
                 .email(req.getEmail())
                 .passwordHash(passwordHash)
                 .fullName(req.getFullName())
@@ -74,12 +73,9 @@ public class AuthService {
                 .build();
 
         user = userRepository.save(user);
-
-        User finalUser = user;
-
         eventProducer.publish(
                 "USER_REGISTERED", Map.of(
-                        "userId", user.getUserId().toString(),
+                        "userId", user.getId().toString(),
                         "email", user.getEmail()
                 )
         );
