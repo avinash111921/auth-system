@@ -1,158 +1,66 @@
 package com.token_service.grpc;
 
+import com.google.protobuf.Empty;
 import com.token_service.config.JwtProperties;
-import com.token_service.entity.AccessTokenResult;
-import com.token_service.service.RefreshTokenService;
-import com.token_service.service.RevokeService;
+import com.token_service.service.RefreshSessions;
 import com.token_service.service.TokenService;
-import io.grpc.Status;
 import io.grpc.stub.StreamObserver;
-import lombok.AllArgsConstructor;
+import lombok.RequiredArgsConstructor;
 import net.devh.boot.grpc.server.service.GrpcService;
 
 import java.util.UUID;
 
+/** Straight-line handlers: failures are translated once, in {@link GrpcErrorAdvice}. */
 @GrpcService
-@AllArgsConstructor
+@RequiredArgsConstructor
 public class TokenGrpcService extends TokenServiceGrpc.TokenServiceImplBase {
 
-    private final TokenService tokenService;
-    private final RefreshTokenService refreshTokenService;
-    private final JwtProperties jwtProperties;
-    private final RevokeService revokeService;
+    private final TokenService accessTokens;
+    private final RefreshSessions refreshSessions;
+    private final JwtProperties props;
 
     @Override
-    public void issueToken(
-            IssueTokenRequest request,
-            StreamObserver<IssueTokenResponse> responseObserver
-    ) {
-        try {
-            UUID userId = UUID.fromString(request.getUserId());
-            String deviceHash = request.getDeviceHash();
-
-            AccessTokenResult accessToken =
-                    tokenService.generateAccessToken(userId, deviceHash);
-
-            String accessJti = accessToken.getJti();
-
-            String refreshToken =
-                    refreshTokenService.create(
-                            userId,
-                            deviceHash,
-                            accessJti
-                    );
-
-            IssueTokenResponse response =
-                    IssueTokenResponse.newBuilder()
-                            .setAccessToken(accessToken.getToken())
-                            .setRefreshToken(refreshToken)
-                            .setAccessJti(accessJti)
-                            .setExpiresIn(jwtProperties.getAccessTtl())
-                            .build();
-
-            responseObserver.onNext(response);
-            responseObserver.onCompleted();
-
-        } catch (Exception ex) {
-            responseObserver.onError(
-                    Status.INTERNAL
-                            .withDescription(ex.getMessage())
-                            .withCause(ex)
-                            .asRuntimeException()
-            );
-        }
+    public void issueToken(IssueTokenRequest request, StreamObserver<TokenPair> out) {
+        UUID userId = UUID.fromString(request.getUserId());
+        String refreshToken = refreshSessions.start(userId, requireDeviceId(request.getDeviceId()));
+        respond(out, tokenPair(userId, refreshToken));
     }
 
     @Override
-    public void refreshToken(
-            RefreshTokenRequest request,
-            StreamObserver<IssueTokenResponse> responseObserver
-    ) {
-        try {
-            UUID userId =
-                    refreshTokenService.rotate(
-                            request.getRefreshToken(),
-                            request.getDeviceHash(),
-                            request.getAccessJti()
-                    );
-
-            AccessTokenResult accessToken =
-                    tokenService.generateAccessToken(
-                            userId,
-                            request.getDeviceHash()
-                    );
-
-            String newRefreshToken = refreshTokenService.create(
-                    userId,
-                    request.getDeviceHash(),
-                    accessToken.getJti()
-            );
-
-            IssueTokenResponse response =
-                    IssueTokenResponse.newBuilder()
-                            .setAccessToken(accessToken.getToken())
-                            .setRefreshToken(newRefreshToken)
-                            .setAccessJti(accessToken.getJti())
-                            .setExpiresIn(jwtProperties.getAccessTtl())
-                            .build();
-
-            responseObserver.onNext(response);
-            responseObserver.onCompleted();
-
-        } catch (IllegalArgumentException ex) {
-            responseObserver.onError(
-                    Status.UNAUTHENTICATED
-                            .withDescription("Invalid or expired refresh token")
-                            .withCause(ex)
-                            .asRuntimeException()
-            );
-        }
+    public void refreshToken(RefreshTokenRequest request, StreamObserver<TokenPair> out) {
+        var rotation = refreshSessions.rotate(request.getRefreshToken(), requireDeviceId(request.getDeviceId()));
+        respond(out, tokenPair(rotation.userId(), rotation.refreshToken()));
     }
 
     @Override
-    public void revokeToken(
-            RevokeTokenRequest request,
-            StreamObserver<RevokeResponse> responseObserver
-    ) {
-        try{
-            revokeService.revokeSingle(request.getRefreshToken(),request.getDeviceHash());
-            responseObserver.onNext(
-                    RevokeResponse.newBuilder()
-                            .setSuccess(true)
-                            .build()
-            );
-            responseObserver.onCompleted();
-        } catch (Exception e) {
-            responseObserver.onError(
-                    Status.PERMISSION_DENIED
-                            .withDescription(e.getMessage())
-                            .asRuntimeException()
-            );
-        }
+    public void revokeToken(RevokeTokenRequest request, StreamObserver<Empty> out) {
+        refreshSessions.revoke(request.getRefreshToken());
+        respond(out, Empty.getDefaultInstance());
     }
+
     @Override
-    public void revokeAllTokens(
-            RevokeAllTokensRequest request,
-            StreamObserver<RevokeResponse> responseObserver
-    ) {
-        try {
-            revokeService.revokeAllForUser(
-                    UUID.fromString(request.getUserId())
-            );
+    public void revokeAllTokens(RevokeAllTokensRequest request, StreamObserver<Empty> out) {
+        refreshSessions.revokeAll(UUID.fromString(request.getUserId()));
+        respond(out, Empty.getDefaultInstance());
+    }
 
-            responseObserver.onNext(
-                    RevokeResponse.newBuilder()
-                            .setSuccess(true)
-                            .build()
-            );
-            responseObserver.onCompleted();
+    private TokenPair tokenPair(UUID userId, String refreshToken) {
+        return TokenPair.newBuilder()
+                .setAccessToken(accessTokens.generateAccessToken(userId))
+                .setRefreshToken(refreshToken)
+                .setExpiresIn(props.getAccessTtl())
+                .build();
+    }
 
-        } catch (Exception e) {
-            responseObserver.onError(
-                    Status.INTERNAL
-                            .withDescription(e.getMessage())
-                            .asRuntimeException()
-            );
+    private static String requireDeviceId(String deviceId) {
+        if (deviceId.isBlank()) {
+            throw new IllegalArgumentException("device_id is required");
         }
+        return deviceId;
+    }
+
+    private static <T> void respond(StreamObserver<T> out, T value) {
+        out.onNext(value);
+        out.onCompleted();
     }
 }

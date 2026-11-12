@@ -71,9 +71,3 @@ eureka:
       defaultZone: http://localhost:8761/eureka
     register-with-eureka: true
     fetch-registry: true
-
-
-# Producer sends message
-#Leader broker writes it
-#All ISR replicas replicate it
-#✅ ACK sent back to producer

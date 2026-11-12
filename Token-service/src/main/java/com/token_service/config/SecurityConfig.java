@@ -20,7 +20,7 @@ public class SecurityConfig {
                         session.sessionCreationPolicy(SessionCreationPolicy.STATELESS)
                 )
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers("/.well-known/**", "/test/token/**").permitAll()
+                        .requestMatchers("/.well-known/**").permitAll()
                         .anyRequest().authenticated()
                 )
                 .build();
