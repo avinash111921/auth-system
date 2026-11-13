@@ -1,41 +1,8 @@
-#server:
-#  port: 8083
 
 spring:
   application:
     name: otp
   config:
-    import: optional:configserver:http://localhost:8888
-
-#  mail:
-#    host: smtp.gmail.com
-#    port: 587
-#    username: avinash1921avi@gmail.com
-#    password: japk duzr tomb jxjv
-#    properties:
-#      mail.smtp.auth: true
-#      mail.smtp.starttls.enable: true
-#  data:
-#    redis:
-#      host: redis_container
-#      port: 6379
-#      database: 1
-#
-#otp:
-#  ttl: 300
-#
-#grpc:
-#  server:
-#    port: 9093
-#
-#eureka:
-#  instance:
-#    metadata-map:
-#      grpc.port: 9093
-#
-#  client:
-#    service-url:
-#      defaultZone: http://localhost:8761/eureka
-#    register-with-eureka: true
-#    fetch-registry: true
-#
+    import:
+      - optional:file:.env[.properties]
+      - optional:configserver:http://localhost:8888
