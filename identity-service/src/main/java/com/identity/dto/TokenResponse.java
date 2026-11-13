@@ -1,20 +1,10 @@
 package com.identity.dto;
 
-import jakarta.validation.constraints.NotBlank;
-import lombok.AllArgsConstructor;
-import lombok.Data;
+import com.identity.grpc.TokenPair;
 
-@Data
-@AllArgsConstructor
-public class TokenResponse {
-    @NotBlank
-    private String accessToken;
+public record TokenResponse(String accessToken, String refreshToken, String tokenType, long expiresIn) {
 
-    @NotBlank
-    private String refreshToken;
-
-    private String accessJti;
-
-    @NotBlank
-    private long expiresIn;
+    public static TokenResponse from(TokenPair pair) {
+        return new TokenResponse(pair.accessToken(), pair.refreshToken(), "Bearer", pair.expiresIn());
+    }
 }

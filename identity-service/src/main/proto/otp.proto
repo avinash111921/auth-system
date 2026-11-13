@@ -1,34 +1,28 @@
 syntax = "proto3";
 
+package auth.otp.v1;
+
 option java_multiple_files = true;
 option java_package = "com.otp.grpc";
 option java_outer_classname = "OtpProto";
 
 service OtpService {
-
-  rpc verifyOtp (OtpVerifyRequest) returns (OtpVerifyResponse);
-
-  rpc VerifyPasswordResetOtp (OtpVerifyRequest) returns (OtpVerifyResponse);
-
-  rpc verifyLoginOtp (VerifyLoginOtpRequest) returns (VerifyLoginOtpResponse);
+  rpc Verify(VerifyRequest) returns (VerifyResponse);
 }
 
-
-message OtpVerifyRequest {
-  string email = 1;
-  string otp = 2;
+enum Purpose {
+  PURPOSE_UNSPECIFIED = 0;
+  PURPOSE_REGISTRATION = 1;
+  PURPOSE_PASSWORD_RESET = 2;
+  PURPOSE_LOGIN = 3;
 }
 
-message OtpVerifyResponse {
-  bool valid = 1;
+message VerifyRequest {
+  Purpose purpose = 1;
+  string subject = 2;
+  string code = 3;
 }
 
-message VerifyLoginOtpRequest {
-  string email = 1;
-  string challengeId = 2;
-  string otp         = 3;
-}
-
-message VerifyLoginOtpResponse {
+message VerifyResponse {
   bool valid = 1;
 }

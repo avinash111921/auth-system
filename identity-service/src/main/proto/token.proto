@@ -1,46 +1,40 @@
 syntax = "proto3";
 
-package token;
+package auth.token.v1;
+
+import "google/protobuf/empty.proto";
 
 option java_multiple_files = true;
 option java_package = "com.token_service.grpc";
 option java_outer_classname = "TokenProto";
 
 service TokenService {
-  rpc IssueToken (IssueTokenRequest) returns (IssueTokenResponse);
-  rpc RefreshToken (RefreshTokenRequest) returns (IssueTokenResponse);
-
-  rpc RevokeToken (RevokeTokenRequest) returns (RevokeResponse);
-  rpc RevokeAllTokens (RevokeAllTokensRequest) returns (RevokeResponse);
+  rpc IssueToken(IssueTokenRequest) returns (TokenPair);
+  rpc RefreshToken(RefreshTokenRequest) returns (TokenPair);
+  rpc RevokeToken(RevokeTokenRequest) returns (google.protobuf.Empty);
+  rpc RevokeAllTokens(RevokeAllTokensRequest) returns (google.protobuf.Empty);
 }
 
 message IssueTokenRequest {
-  string userId = 1;
-  string deviceHash = 2;
+  string user_id = 1;
+  string device_id = 2;
 }
 
 message RefreshTokenRequest {
-  string refreshToken = 1;
-  string deviceHash = 2;
-  string accessJti = 3;
+  string refresh_token = 1;
+  string device_id = 2;
 }
 
 message RevokeTokenRequest {
-  string refreshToken = 1;
-  string deviceHash = 2;
+  string refresh_token = 1;
 }
 
 message RevokeAllTokensRequest {
-  string userId = 1;
+  string user_id = 1;
 }
 
-message IssueTokenResponse {
-  string accessToken = 1;
-  string refreshToken = 2;
-  string accessJti = 3;
-  int64 expiresIn = 4;
-}
-
-message RevokeResponse {
-  bool success = 1;
+message TokenPair {
+  string access_token = 1;
+  string refresh_token = 2;
+  int64 expires_in = 3;
 }

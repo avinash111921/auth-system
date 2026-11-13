@@ -1,73 +1,84 @@
 package com.identity.controller;
 
+
+import com.identity.client.ClientContext;
 import com.identity.dto.*;
-import com.identity.service.AuthService;
+import com.identity.service.LoginService;
+import com.identity.service.PasswordResetService;
+import com.identity.service.RegistrationService;
+import com.identity.service.SessionService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
-import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.http.HttpStatus;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.oauth2.jwt.Jwt;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.ResponseStatus;
+import org.springframework.web.bind.annotation.RestController;
+
+import java.util.UUID;
 
 @RestController
 @RequestMapping("/api/auth")
 @RequiredArgsConstructor
 public class AuthController {
 
-    private final AuthService authService;
+    private final RegistrationService registration;
+    private final LoginService login;
+    private final PasswordResetService passwordReset;
+    private final SessionService sessions;
 
     @PostMapping("/register")
-    public ResponseEntity<?> register(@Valid @RequestBody RegisterRequest req) {
-        UserResponse user = authService.register(req);
-        return ResponseEntity.ok(user);
+    @ResponseStatus(HttpStatus.ACCEPTED)
+    public RegistrationStarted register(@Valid @RequestBody RegisterRequest body) {
+        return new RegistrationStarted(registration.start(body.email(), body.fullName(), body.password()));
     }
 
     @PostMapping("/verify-otp")
-    public ResponseEntity<?> verifyOtp(@RequestBody VerifyOtp req) {
-        authService.verifyOtp(req.getEmail(), req.getOtp());
-        return ResponseEntity.ok("verified");
-    }
-
-    @PostMapping("/otp-login")
-    public ResponseEntity<?> otpLogin(@RequestBody OtpLoginRequest req) {
-        TokenResponse response = authService.verifyLoginOtp(req.getEmail(), req.getOtp(), req.getChallengeId());
-        return ResponseEntity.ok(response);
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void verifyRegistration(@Valid @RequestBody VerifyRegistrationRequest body) {
+        registration.complete(body.registrationId(), body.otp());
     }
 
     @PostMapping("/login")
-    public ResponseEntity<?> login(@RequestBody LoginRequest req) {
-        return ResponseEntity.ok(authService.login(req));
+    public LoginResponse login(@Valid @RequestBody LoginRequest body, ClientContext client) {
+        return LoginResponse.from(login.login(body.email(), body.password(), client));
+    }
+
+    @PostMapping("/otp-login")
+    public TokenResponse loginWithOtp(@Valid @RequestBody LoginOtpRequest body, ClientContext client) {
+        return TokenResponse.from(login.verifyChallenge(body.challengeId(), body.otp(), client));
     }
 
     @PostMapping("/forgot-password")
-    public ResponseEntity<?> forgotPassword(@RequestBody OtpRequestForgetPassword req) {
-        authService.forgotPassword(req.getEmail());
-        return ResponseEntity.ok("otp_sent");
+    @ResponseStatus(HttpStatus.ACCEPTED)
+    public void forgotPassword(@Valid @RequestBody ForgotPasswordRequest body) {
+        passwordReset.request(body.email());
     }
 
     @PostMapping("/reset-password")
-    public ResponseEntity<?> resetPassword(@RequestBody ForgetPasswordRequest req) {
-        authService.resetPassword(req.getEmail(), req.getOtp(), req.getNewPassword());
-        return ResponseEntity.ok("password_changed");
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void resetPassword(@Valid @RequestBody ResetPasswordRequest body) {
+        passwordReset.reset(body.email(), body.otp(), body.newPassword());
     }
 
     @PostMapping("/refresh")
-    public ResponseEntity<?> refreshToken(@RequestBody TokenRefreshRequest req) {
-        TokenResponse tokenResponse = authService.refresh(req.getRefreshToken(), req.getDeviceHash(),req.getAccessJti());
-        return ResponseEntity.ok(tokenResponse);
+    public TokenResponse refresh(@Valid @RequestBody RefreshTokenRequest body, ClientContext client) {
+        return TokenResponse.from(sessions.refresh(body.refreshToken(), client));
     }
 
     @PostMapping("/logout")
-    public ResponseEntity<?> logout(
-            @RequestBody RevokeTokenRequest req
-    ) {
-        boolean response = authService.revokeToken(req.getRefreshToken(), req.getDeviceHash());
-        return ResponseEntity.ok(response);
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void logout(@Valid @RequestBody RefreshTokenRequest body) {
+        sessions.logout(body.refreshToken());
     }
 
+    /** The user comes from the verified access token; a request body can't name someone else. */
     @PostMapping("/logout-all")
-    public ResponseEntity<?> logoutAll(
-            @RequestBody RevokeAllTokenRequest req
-    ) {
-        boolean response = authService.revokeAllTokens(req.getUserId());
-        return ResponseEntity.ok(response);
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void logoutAll(@AuthenticationPrincipal Jwt jwt) {
+        sessions.logoutEverywhere(UUID.fromString(jwt.getSubject()));
     }
 }

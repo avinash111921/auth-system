@@ -1,44 +1,30 @@
 syntax = "proto3";
 
+package auth.risk.v1;
+
 option java_multiple_files = true;
 option java_package = "com.risk.grpc";
 option java_outer_classname = "RiskProto";
 
 service RiskService {
-
-  rpc AssessRisk (RiskRequest) returns (RiskResponse);
-
-  rpc RecordFailure (FailureRequest) returns (Empty);
-
-  rpc OnLoginSuccess (LoginSuccessRequest) returns (Empty);
+  rpc AssessLogin(AssessLoginRequest) returns (AssessLoginResponse);
 }
 
-message RiskRequest {
-  string userId = 1;
-  string deviceFingerprint = 2;
+message AssessLoginRequest {
+  string user_id = 1;
+  string device_id = 2;
   string ip = 3;
 }
 
-message FailureRequest {
-  string userId = 1;
-}
-
-message LoginSuccessRequest {
-  string userId = 1;
-  string deviceFingerprint = 2;
-  string ip = 3;
-}
-
-message RiskResponse {
+message AssessLoginResponse {
   RiskLevel level = 1;
   int32 score = 2;
   repeated string reasons = 3;
 }
 
-message Empty {}
-
 enum RiskLevel {
-  LOW = 0;
-  MEDIUM = 1;
-  HIGH = 2;
+  RISK_LEVEL_UNSPECIFIED = 0;
+  RISK_LEVEL_LOW = 1;
+  RISK_LEVEL_MEDIUM = 2;
+  RISK_LEVEL_HIGH = 3;
 }
