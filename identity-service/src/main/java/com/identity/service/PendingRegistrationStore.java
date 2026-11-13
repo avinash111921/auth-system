@@ -21,7 +21,7 @@ class PendingRegistrationStore {
         redis.opsForValue().set(key(registrationId), json.writeValueAsString(registration), TTL);
     }
 
-    /** GETDEL: of two concurrent completions of the same registration, exactly one gets the row. */
+    /** GET DEL: of two concurrent completions of the same registration, exactly one gets the row. */
     Optional<PendingRegistration> take(String registrationId) {
         return Optional.ofNullable(redis.opsForValue().getAndDelete(key(registrationId)))
                 .map(value -> json.readValue(value, PendingRegistration.class));

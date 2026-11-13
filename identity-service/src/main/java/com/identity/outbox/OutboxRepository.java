@@ -12,8 +12,8 @@ import java.util.UUID;
 public interface OutboxRepository extends JpaRepository<OutboxEvent, UUID> {
 
     /**
-        Rows another relay instance already holds are skipped,
-        so replicas never publish the same batch.
+     Rows another relay instance already holds are skipped,
+     so replicas never publish the same batch.
      */
 
     @Query(value = """
@@ -24,6 +24,13 @@ public interface OutboxRepository extends JpaRepository<OutboxEvent, UUID> {
             FOR UPDATE SKIP LOCKED
             """, nativeQuery = true)
     List<OutboxEvent> lockPending(@Param("limit") int limit);
+
+    /**
+     Transaction-scoped advisory lock: only one relay publishes at a time, so two replicas
+     can't interleave batches and reorder events for the same key.
+     */
+    @Query(value = "SELECT pg_try_advisory_xact_lock(:lockId)", nativeQuery = true)
+    boolean tryRelayLock(@Param("lockId") long lockId);
 
     @Modifying
     @Query("DELETE FROM OutboxEvent e WHERE e.publishedAt < :cutoff")

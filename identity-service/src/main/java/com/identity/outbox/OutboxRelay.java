@@ -14,10 +14,10 @@ import java.util.List;
 import java.util.concurrent.CompletableFuture;
 
 /**
-    Moves committed outbox rows to Kafka.
-    Delivery is at-least-once: a crash between the broker
-    ack and our commit republishes the batch,
-    so consumers de-duplicate on the event-id header.
+ Moves committed outbox rows to Kafka.
+ Delivery is at-least-once: a crash between the broker
+ ack and our commit republishes the batch,
+ so consumers de-duplicate on the event-id header.
  */
 
 @Component
@@ -26,6 +26,8 @@ class OutboxRelay {
 
     private static final int BATCH_SIZE = 200;
     private static final Duration RETENTION = Duration.ofDays(7);
+    // Any fixed number unique to this purpose within the database.
+    private static final long RELAY_LOCK = 0x6f75_7462_6f78L;
 
     private final OutboxRepository outbox;
     private final KafkaTemplate<String, String> kafka;
@@ -33,6 +35,10 @@ class OutboxRelay {
     @Scheduled(fixedDelay = 500)
     @Transactional
     public void publishPending() {
+        // Another replica is publishing; it will pick these rows up in order.
+        if (!outbox.tryRelayLock(RELAY_LOCK)) {
+            return;
+        }
         List<OutboxEvent> batch = outbox.lockPending(BATCH_SIZE);
         if (batch.isEmpty()) {
             return;

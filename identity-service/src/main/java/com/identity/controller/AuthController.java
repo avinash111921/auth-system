@@ -12,6 +12,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -73,6 +74,12 @@ public class AuthController {
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void logout(@Valid @RequestBody RefreshTokenRequest body) {
         sessions.logout(body.refreshToken());
+    }
+
+    /** A protected resource for clients to check their access token against. */
+    @GetMapping("/me")
+    public MeResponse me(@AuthenticationPrincipal Jwt jwt) {
+        return MeResponse.from(sessions.currentUser(UUID.fromString(jwt.getSubject())), jwt);
     }
 
     /** The user comes from the verified access token; a request body can't name someone else. */

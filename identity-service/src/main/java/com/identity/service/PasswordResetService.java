@@ -23,6 +23,7 @@ public class PasswordResetService {
     private final OtpClient otp;
     private final TokenClient tokens;
     private final LoginThrottle throttle;
+    private final OtpGuessBudget otpGuesses;
     private final OutboxWriter outbox;
 
     /** Silent when the email is unknown, so this endpoint can't be used to enumerate accounts. */
@@ -33,6 +34,7 @@ public class PasswordResetService {
 
     public void reset(String rawEmail, String code, String newPassword) {
         String email = Emails.normalize(rawEmail);
+        otpGuesses.spend("password-reset", email);
         if (!otp.verify(Purpose.PURPOSE_PASSWORD_RESET, email, code)) {
             throw new AuthException(ErrorCode.INVALID_OTP);
         }
@@ -45,5 +47,6 @@ public class PasswordResetService {
         user.changePassword(newHash);
         users.save(user);
         throttle.reset(email);
+        otpGuesses.clear("password-reset", email);
     }
 }

@@ -16,8 +16,8 @@ import java.time.Instant;
 import java.util.UUID;
 
 /**
-    Only verified accounts live here; unverified sign-ups stay in Redis
-    until their OTP is checked.
+ Only verified accounts live here; unverified sign-ups stay in Redis
+ until their OTP is checked.
  */
 
 @Entity

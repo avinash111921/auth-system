@@ -7,7 +7,7 @@ option java_package = "com.otp.grpc";
 option java_outer_classname = "OtpProto";
 
 service OtpService {
-  rpc verify (VerifyRequest) returns (VerifyResponse);
+  rpc Verify (VerifyRequest) returns (VerifyResponse);
 }
 
 enum Purpose {

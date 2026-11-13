@@ -1,5 +1,7 @@
 server:
   port: 8081
+  # Trust X-Forwarded-For only from internal proxies (the gateway), so getRemoteAddr() is the real client.
+  forward-headers-strategy: native
 
 spring:
   data:
@@ -7,11 +9,6 @@ spring:
       host: ${REDIS_HOST:localhost}
       port: 6379
       timeout: 2s
-#      lettuce:
-#        pool:
-#          max-active: 16
-#          max-idle: 8
-#          min-idle: 2
       database: 2
 
   datasource:
@@ -43,7 +40,11 @@ auth:
   jwt:
     issuer : auth-platform
   device-cookie:
-    secret: ${SERVICE_AUTH_IDENTITY_SECRET}
+    secret: ${DEVICE_COOKIE_SECRET}
+    name: ${DEVICE_COOKIE_NAME:__Host-device}
+    secure: ${DEVICE_COOKIE_SECURE:true}
+  server-timing:
+    enabled: ${SERVER_TIMING_ENABLED:false}
 
 service-auth:
   service-name: identity-service

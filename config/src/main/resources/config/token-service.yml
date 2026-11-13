@@ -7,15 +7,16 @@ spring:
       host: ${REDIS_HOST:localhost}
       port: 6379
       timeout: 2s
-#      lettuce:
-#        pool:
-#          max-active: 16
-#          max-idle: 8
-#          min-idle: 2
+      #      lettuce:
+      #        pool:
+      #          max-active: 16
+      #          max-idle: 8
+      #          min-idle: 2
       database: 0
 
 jwt:
   issuer: auth-platform
+  key-encryption-secret: ${JWT_KEY_ENCRYPTION_SECRET}
   accessTtl: 900
   refreshTtl: 2592000
   key-rotation:
@@ -51,4 +52,4 @@ service-auth:
     identity-service:
       secret: ${SERVICE_AUTH_IDENTITY_SECRET}
       allowed-services:
-        - auth.otp.v1.TokenService
+        - auth.token.v1.TokenService

@@ -29,6 +29,7 @@ public class LoginService {
     private final UserRepository users;
     private final PasswordEncoder passwordEncoder;
     private final LoginThrottle throttle;
+    private final OtpGuessBudget otpGuesses;
     private final LoginChallengeStore challenges;
     private final RiskClient risk;
     private final OtpClient otp;
@@ -37,11 +38,12 @@ public class LoginService {
     private final String unknownUserHash;
 
     public LoginService(UserRepository users, PasswordEncoder passwordEncoder, LoginThrottle throttle,
-                        LoginChallengeStore challenges, RiskClient risk, OtpClient otp, TokenClient tokens,
+                        OtpGuessBudget otpGuesses, LoginChallengeStore challenges, RiskClient risk, OtpClient otp, TokenClient tokens,
                         OutboxWriter outbox) {
         this.users = users;
         this.passwordEncoder = passwordEncoder;
         this.throttle = throttle;
+        this.otpGuesses = otpGuesses;
         this.challenges = challenges;
         this.risk = risk;
         this.otp = otp;
@@ -52,14 +54,13 @@ public class LoginService {
 
     public LoginResult login(String rawEmail, String password, ClientContext client) {
         String email = Emails.normalize(rawEmail);
-        throttle.checkAllowed(email, client.ip());
+        throttle.acquire(email, client.ip());
 
         Optional<User> found = users.findByEmail(email);
         // Hash even for unknown emails so response time doesn't reveal which accounts exist.
         boolean matches = passwordEncoder.matches(password, found.map(User::getPasswordHash).orElse(unknownUserHash));
 
         if (found.isEmpty() || !matches) {
-            throttle.recordFailure(email, client.ip());
             found.ifPresent(user -> outbox.append(new LoginFailed(user.getId(), client.ip(), client.deviceId())));
             throw new AuthException(ErrorCode.INVALID_CREDENTIALS);
         }
@@ -68,7 +69,7 @@ public class LoginService {
         if (!user.canLogIn()) {
             throw new AuthException(ErrorCode.ACCOUNT_UNAVAILABLE);
         }
-        throttle.reset(email);
+        throttle.succeeded(email, client.ip());
 
         RiskDecision decision = risk.assess(user.getId(), client);
         return switch (decision.outcome()) {
@@ -86,9 +87,12 @@ public class LoginService {
                 .filter(c -> c.deviceId().equals(client.deviceId()))
                 .orElseThrow(() -> new AuthException(ErrorCode.INVALID_OTP));
 
+        String account = challenge.userId().toString();
+        otpGuesses.spend("login", account);
         if (!otp.verify(Purpose.PURPOSE_LOGIN, challengeId, code) || challenges.take(challengeId).isEmpty()) {
             throw new AuthException(ErrorCode.INVALID_OTP);
         }
+        otpGuesses.clear("login", account);
 
         User user = users.findById(challenge.userId())
                 .filter(User::canLogIn)

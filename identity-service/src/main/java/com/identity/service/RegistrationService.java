@@ -31,16 +31,18 @@ public class RegistrationService {
     private final OtpClient otp;
     private final OutboxWriter outbox;
 
-    /** Same response whether or not the email is taken, so registration can't enumerate accounts. */
+    /** Same response whether the email is taken, so registration can't enumerate accounts. */
     public String start(String rawEmail, String fullName, String password) {
         String email = Emails.normalize(rawEmail);
         String registrationId = RandomIds.next();
+        // Hashed on both paths: skipping bcrypt for a taken email made that answer measurably faster.
+        String passwordHash = passwordEncoder.encode(password);
 
         if (users.existsByEmail(email)) {
             outbox.append(new AccountExistsNotice(email));
             return registrationId;
         }
-        pending.save(registrationId, new PendingRegistration(email, fullName.strip(), passwordEncoder.encode(password)));
+        pending.save(registrationId, new PendingRegistration(email, fullName.strip(), passwordHash));
         outbox.append(new VerificationRequested(registrationId, email));
         return registrationId;
     }

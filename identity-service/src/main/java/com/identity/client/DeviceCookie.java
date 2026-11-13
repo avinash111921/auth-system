@@ -20,21 +20,35 @@ import java.util.Optional;
 @Component
 public class DeviceCookie {
 
-    static final String NAME = "__Host-device";
     private static final Duration MAX_AGE = Duration.ofDays(365);
 
     private final SecretKeySpec key;
+    private final String name;
+    private final boolean secure;
 
-    public DeviceCookie(@Value("${auth.device-cookie.secret}") String secret) {
+    /**
+     Defaults to a __Host- cookie (Secure, no Domain, Path=/).
+     A local test client on plain HTTP in a browser that won't store
+     Secure cookies for localhost can switch to
+     name=device, secure=false; a __Host- name without Secure is refused at startup.
+     */
+    public DeviceCookie(@Value("${auth.device-cookie.secret}") String secret,
+                        @Value("${auth.device-cookie.name:__Host-device}") String name,
+                        @Value("${auth.device-cookie.secure:true}") boolean secure) {
+        if (name.startsWith("__Host-") && !secure) {
+            throw new IllegalStateException("auth.device-cookie.secure must be true for a __Host- cookie");
+        }
         this.key = Hmac.key(secret, "auth.device-cookie");
+        this.name = name;
+        this.secure = secure;
     }
 
     /**
-        The device ID from a cookie we issued, or empty if it is missing
-        or was tampered with.
+     The device ID from a cookie we issued, or empty if it is missing
+     or was tampered with.
      */
     public Optional<String> read(HttpServletRequest request) {
-        Cookie cookie = WebUtils.getCookie(request, NAME);
+        Cookie cookie = WebUtils.getCookie(request, name);
         if (cookie == null) {
             return Optional.empty();
         }
@@ -50,9 +64,9 @@ public class DeviceCookie {
 
     public String issue(HttpServletResponse response) {
         String deviceId = RandomIds.next();
-        ResponseCookie cookie = ResponseCookie.from(NAME, deviceId + "." + encode(Hmac.sign(key, deviceId)))
+        ResponseCookie cookie = ResponseCookie.from(name, deviceId + "." + encode(Hmac.sign(key, deviceId)))
                 .httpOnly(true)
-                .secure(true)
+                .secure(secure)
                 .sameSite("Lax")
                 .path("/")
                 .maxAge(MAX_AGE)

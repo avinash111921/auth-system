@@ -3,11 +3,11 @@ package com.identity.outbox;
 import java.util.UUID;
 
 /**
-    Everything identity-service tells the rest of the platform.
-    {@link #key()} is the Kafka record key, so all events about one user
-    (or one pending registration) stay in order on one partition.
-    {@link #type()} travels as a header and is versioned for safe
-    evolution.
+ Everything identity-service tells the rest of the platform.
+ {@link #key()} is the Kafka record key, so all events about one user
+ (or one pending registration) stay in order on one partition.
+ {@link #type()} travels as a header and is versioned for safe
+ evolution.
  */
 
 public sealed interface AuthEvent {
