@@ -11,5 +11,6 @@ import java.time.Instant;
 @NoArgsConstructor
 public class StoredKey {
     private String jwkJson;
+    private String publicJwkJson;
     private Instant createdAt;
 }
